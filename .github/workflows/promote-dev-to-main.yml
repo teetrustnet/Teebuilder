@@ -1,0 +1,48 @@
+name: Promote dev to main
+on:
+  workflow_dispatch:
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Git config
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch branches
+        run: |
+          git fetch origin main:main || true
+          git fetch origin dev:dev || true
+
+      - name: Prepare merge candidate
+        run: |
+          git switch -C ci-merge-main-from-dev main
+          git merge --no-ff dev -m "release: merge dev into main"
+
+      - name: Run tests
+        run: |
+          if [ -f Cargo.toml ]; then
+            sudo apt-get update && sudo apt-get install -y pkg-config libssl-dev
+            rustup default stable || true
+            cargo test --all --locked
+          elif [ -f package.json ]; then
+            npm ci
+            npm test --if-present
+          elif [ -f go.mod ]; then
+            go test ./...
+          else
+            echo "no tests"
+          fi
+
+      - name: Fast-forward main and push
+        run: |
+          git switch main
+          git merge --ff-only ci-merge-main-from-dev
+          git push origin main

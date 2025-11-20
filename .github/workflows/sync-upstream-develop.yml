@@ -1,0 +1,36 @@
+name: Sync upstream develop to dev
+on:
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Git config
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Ensure upstream remote
+        run: |
+          git remote add upstream https://github.com/flashbots/rbuilder.git || true
+          git fetch upstream
+
+      - name: Update upstream-develop branch
+        run: |
+          git switch -C upstream-develop upstream/develop
+
+      - name: Merge upstream-develop into dev
+        run: |
+          if git show-ref --verify --quiet refs/heads/dev; then
+            git switch dev
+          else
+            git switch -c dev
+          fi
+          git merge --no-ff upstream-develop -m "sync: merge upstream develop"
+          git push origin dev
